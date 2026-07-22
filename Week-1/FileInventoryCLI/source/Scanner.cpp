@@ -37,25 +37,30 @@ namespace finv
             const directory_entry &entry = *it;
 
             // Only consider regular files
-            std::error_code st;
-            if (!entry.is_regular_file(st))
+            std::error_code statEc;
+            if (!entry.is_regular_file(statEc))
             {
                 continue;
             }
 
             // Respect maxDepth if configured
-            if (maxDepth)
+            if (filter.config_.maxDepth)
             {
-                std::error_code relEc;
                 path rel = entry.path().lexically_relative(root);
                 if (!rel.empty())
                 {
-                    int depth = 0;
-                    for (auto &part : rel)
+                    int depth = -1;
+                    for (auto &part: rel)
                         ++depth;
-                    if (depth > *maxDepth)
+                    if (depth > *filter.config_.maxDepth)
                         continue;
                 }
+            }
+
+            // Apply path filtering (include/exclude patterns)
+            if (!filter.Matches(entry.path()))
+            {
+                continue;
             }
 
             FileRecord rec;
@@ -68,7 +73,10 @@ namespace finv
                 for (auto &c : rec.extension)
                     c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
             }
-            catch (...) { rec.extension.clear(); }
+            catch (...)
+            {
+                rec.extension.clear();
+            }
 
             try
             {
@@ -84,9 +92,10 @@ namespace finv
             {
                 rec.lastModified = entry.last_write_time();
             }
-            catch (...) { /* ignore timestamp failures */ }
-
-            // Currently PathFilter has no public API; filtering would be applied here when available.
+            catch (...)
+            {
+                /* ignore timestamp failures */
+            }
 
             // Deliver record to caller
             onRecord(rec);

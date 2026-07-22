@@ -15,6 +15,9 @@ using namespace finv;
 
 int main (int argc, char *argv[])
 {
+    // Initialize logger from environment variables
+    Logger::InitializeFromEnvironment ();
+
     Logger::Log (Logger::Level::INFO, "File Inventory CLI");
 
     CLIOptions options;

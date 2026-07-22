@@ -14,7 +14,7 @@ namespace finv
     {
     public:
         Scanner (std::filesystem::path root, PathFilter filter, std::optional<int> maxDepth = std::nullopt) :
-            root (std::move (root)), filter (std::move (filter)), maxDepth (maxDepth)
+            root (std::move (root)), filter (std::move (filter))
         {
         }
 
@@ -24,7 +24,6 @@ namespace finv
 
     private:
         std::filesystem::path root;
-        PathFilter filter;
-        std::optional<int> maxDepth;
+        PathFilter filter;        
     };
 }

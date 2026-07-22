@@ -145,11 +145,25 @@
   <ItemGroup>
     <None Include=".clang-format" />
     <None Include=".clang-tidy" />
+    <None Include=".env.logging" />
+    <None Include="00_START_HERE.md" />
+    <None Include="CHECKLIST.md" />
+    <None Include="EXECUTIVE_SUMMARY.md" />
     <None Include="FileInventoryCLI.slnx" />
+    <None Include="IMPLEMENTATION_SUMMARY.md" />
+    <None Include="INSTALLATION_COMPLETE.md" />
+    <None Include="LOGGER_ENHANCEMENT.md" />
+    <None Include="LOGGING.md" />
+    <None Include="LOGGING_QUICK_REF.md" />
+    <None Include="README_LOGGING.md" />
+    <None Include="test_logging.bat" />
+    <None Include="test_logging.ps1" />
+    <None Include="VISUAL_SUMMARY.md" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\Aggregator.cpp" />
     <ClCompile Include="source\CliOptions.cpp" />
+    <ClCompile Include="source\Filter.cpp" />
     <ClCompile Include="source\Main.cpp" />
     <ClCompile Include="source\Report.cpp" />
     <ClCompile Include="source\Scanner.cpp" />
