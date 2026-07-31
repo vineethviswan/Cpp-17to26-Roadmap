@@ -1,17 +1,16 @@
 
 #include "Report.h"
+#include "Aggregator.h"
 #include "Types.h"
 
 #include <iomanip>
-#include <sstream>
+#include <format>
 #include <ostream>
 #include <string>
 #include <memory>
-#include <cstdio>
 #include <map>
 #include <cstdint>
 
-#include <limits>
 
 namespace finv
 {
@@ -48,9 +47,7 @@ namespace finv
 				default:
 					if (c < 0x20)
 					{
-						char buf[7];
-						std::snprintf(buf, sizeof(buf), "\\u%04x", c);
-						out += buf;
+						out += std::format("\\u{:04x}", c);
 					}
 					else
 					{
@@ -67,42 +64,39 @@ namespace finv
 			constexpr uint64_t KB = 1024ULL;
 			constexpr uint64_t MB = KB * 1024ULL;
 			constexpr uint64_t GB = MB * 1024ULL;
-			std::ostringstream ss;
-			ss.setf(std::ios::fixed);
-			ss.precision(2);
-			if (bytes >= GB) ss << (static_cast<double>(bytes) / GB) << " GB";
-			else if (bytes >= MB) ss << (static_cast<double>(bytes) / MB) << " MB";
-			else if (bytes >= KB) ss << (static_cast<double>(bytes) / KB) << " KB";
-			else ss << bytes << " B";
-			return ss.str();
+			if (bytes >= GB) return std::format("{:.2f} GB", static_cast<double>(bytes) / GB);
+			if (bytes >= MB) return std::format("{:.2f} MB", static_cast<double>(bytes) / MB);
+			if (bytes >= KB) return std::format("{:.2f} KB", static_cast<double>(bytes) / KB);
+			return std::format("{} B", bytes);
 		}
 	}
 
 	void TextReport::Write (std::ostream &os, const std::filesystem::path &root, GroupBy groupBy,
-			const std::map<SummaryKey, SummaryEntry> &groups, const Totals &totals) const
+			const Aggregator &aggregator) const
 	{
+		const auto &groups = aggregator.GetGroups();
+		const auto &totals = aggregator.GetTotals();
+
 		os << "Root: " << root.string() << "\n";
 		os << "Group By: " << GroupByToString(groupBy) << "\n";
 		os << "\n";
 
 		// Header
 		os << std::left << std::setw(32) << "Group" << std::right << std::setw(10) << "Files"
-		   << std::setw(18) << "Total" << std::setw(12) << "Min" << std::setw(12) << "Max" << "\n";
+			<< std::setw(18) << "Total" << std::setw(12) << "Min" << std::setw(12) << "Max" << "\n";
 		os << std::string(84, '-') << "\n";
 
-		for (const auto &p : groups)
-		{
-			const auto &key = p.first;
-			const auto &e = p.second;
+		for (const auto &[key, e]: groups)
+		{			
 			std::string keyOut = key;
 			if (keyOut.size() > 30)
 				keyOut = keyOut.substr(0, 27) + "...";
 
 			os << std::left << std::setw(32) << keyOut
-			   << std::right << std::setw(10) << e.fileCount
-			   << std::setw(18) << HumanSize(e.totalSizeBytes)
-			   << std::setw(12) << HumanSize(e.minSizeBytes == std::numeric_limits<std::uintmax_t>::max() ? 0 : e.minSizeBytes)
-			   << std::setw(12) << HumanSize(e.maxSizeBytes) << "\n";
+				<< std::right << std::setw(10) << e.fileCount
+				<< std::setw(18) << HumanSize(e.totalSizeBytes)
+				<< std::setw(12) << HumanSize(e.minSizeBytes)
+				<< std::setw(12) << HumanSize(e.maxSizeBytes) << "\n";
 		}
 
 		os << "\n";
@@ -110,8 +104,11 @@ namespace finv
 	}
 
 	void JsonReport::Write (std::ostream &os, const std::filesystem::path &root, GroupBy groupBy,
-			const std::map<SummaryKey, SummaryEntry> &groups, const Totals &totals) const
+			const Aggregator &aggregator) const
 	{
+		const auto &groups = aggregator.GetGroups();
+		const auto &totals = aggregator.GetTotals();
+
 		// Minimal hand-rolled JSON
 		os << "{";
 		os << "\"root\":\"" << JsonEscape(root.string()) << "\",";
@@ -129,7 +126,7 @@ namespace finv
 			os << "\"key\":\"" << JsonEscape(k) << "\",";
 			os << "\"fileCount\":" << e.fileCount << ",";
 			os << "\"totalBytes\":" << e.totalSizeBytes << ",";
-			os << "\"minBytes\":" << (e.minSizeBytes == std::numeric_limits<std::uintmax_t>::max() ? 0 : e.minSizeBytes) << ",";
+			os << "\"minBytes\":" << e.minSizeBytes << ",";
 			os << "\"maxBytes\":" << e.maxSizeBytes;
 			os << "}";
 		}

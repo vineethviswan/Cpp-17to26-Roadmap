@@ -9,7 +9,7 @@ namespace finv
 {
     namespace
     {
-        static std::string ToLower(std::string s)
+        std::string ToLower(std::string s)
         {
             std::transform(s.begin(), s.end(), s.begin(),
                            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -20,14 +20,12 @@ namespace finv
     CLIOptions ParseArgs (int argc, char** argv)
     {
         CLIOptions opts;
-
         bool rootSet = false;
-
         for (int i = 1; i < argc; ++i)
         {
             std::string arg = argv[i];
 
-            if (arg.rfind("--", 0) == 0)
+            if (arg.starts_with("--"))
             {
                 // support --name=value and --name value
                 auto eq = arg.find('=');
@@ -97,7 +95,7 @@ namespace finv
                         int n = std::stoi(v);
                         if (n < 0)
                             throw CliParseError("max-depth must be non-negative");
-                        opts.filterConfig.maxDepth = n;
+                        opts.maxDepth = n;
                     }
                     catch (const std::invalid_argument &)
                     {

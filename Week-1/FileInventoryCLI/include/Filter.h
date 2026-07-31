@@ -19,8 +19,9 @@ namespace finv
         /// @param path The file path to check
         /// @return true if the path matches (or should be included), false otherwise
         [[nodiscard]] bool Matches(const std::filesystem::path& path) const;
+        
+        FilterConfig GetConfig () const { return config_; }
 
-        FilterConfig config_;
     private:        
 
         /// @brief Check if a path matches any pattern in a list
@@ -35,5 +36,7 @@ namespace finv
         /// @param pattern The glob pattern (* for any chars, ? for single char)
         /// @return true if text matches the pattern
         static bool GlobMatch(std::string_view text, std::string_view pattern) noexcept;
+
+        FilterConfig config_;
     };
 }

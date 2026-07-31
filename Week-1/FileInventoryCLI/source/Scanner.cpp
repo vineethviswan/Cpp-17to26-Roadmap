@@ -14,7 +14,7 @@ namespace finv
     void Scanner::Scan (const std::function<void (const FileRecord&)>& onRecord) const
     {
         using namespace std::filesystem;
-
+        FilterConfig config = filter.GetConfig ();
         std::error_code ec;
 
         if (!exists(root, ec) || !is_directory(root, ec))
@@ -24,7 +24,6 @@ namespace finv
         }
 
         directory_options options = directory_options::skip_permission_denied;
-
         for (recursive_directory_iterator it(root, options, ec), end; it != end; it.increment(ec))
         {
             if (ec)
@@ -35,7 +34,6 @@ namespace finv
             }
 
             const directory_entry &entry = *it;
-
             // Only consider regular files
             std::error_code statEc;
             if (!entry.is_regular_file(statEc))
@@ -44,17 +42,9 @@ namespace finv
             }
 
             // Respect maxDepth if configured
-            if (filter.config_.maxDepth)
+            if (maxDepth && static_cast<int>(it.depth()) > *maxDepth)
             {
-                path rel = entry.path().lexically_relative(root);
-                if (!rel.empty())
-                {
-                    int depth = -1;
-                    for (auto &part: rel)
-                        ++depth;
-                    if (depth > *filter.config_.maxDepth)
-                        continue;
-                }
+                continue;
             }
 
             // Apply path filtering (include/exclude patterns)

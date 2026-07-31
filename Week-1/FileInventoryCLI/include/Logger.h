@@ -11,6 +11,12 @@
 #include <algorithm>
 #include <cctype>
 
+#ifdef _MSC_VER
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+
 namespace finv
 {
 
@@ -94,22 +100,28 @@ namespace finv
 
         static void Log (Level level, std::string_view message)
         {
+            std::lock_guard<std::mutex> lock (log_mutex);
             // Gate: check if message meets minimum level
             {
-                std::lock_guard<std::mutex> lock (log_mutex);
                 if (static_cast<int>(level) < static_cast<int>(min_level))
                     return;
             }
-
-            std::lock_guard<std::mutex> lock (log_mutex);
             auto now = std::chrono::system_clock::now ();
             auto timestamp = std::format ("{:%Y-%m-%d %H:%M:%S}", now);
             auto &stream = (level == Level::ERROR || level == Level::WARNING) ? std::cerr : std::cout;
-            stream << std::format ("{}[{}] {}: {}{}\n",
-                    GetLevelColor (level), // Start color
-                    timestamp, GetLevelString (level), message,
-                    "\033[0m" // Reset color at the end
-            );
+
+            if (ShouldUseColor (level))
+            {
+                stream << std::format ("{}[{}] {}: {}{}\n",
+                        GetLevelColor (level), // Start color
+                        timestamp, GetLevelString (level), message,
+                        "\033[0m" // Reset color at the end
+                );
+            }
+            else
+            {
+                stream << std::format ("[{}] {}: {}\n", timestamp, GetLevelString (level), message);
+            }
         }
 
         template<typename... Args>
@@ -151,6 +163,21 @@ namespace finv
                 default:
                     return "\033[0m"; // Reset
             }
+        }
+
+        static bool ShouldUseColor (Level level) noexcept
+        {
+#ifdef _MSC_VER
+            const int fd = (level == Level::ERROR || level == Level::WARNING)
+                    ? _fileno (stderr)
+                    : _fileno (stdout);
+            return fd >= 0 && _isatty (fd) != 0;
+#else
+            const int fd = (level == Level::ERROR || level == Level::WARNING)
+                    ? STDERR_FILENO
+                    : STDOUT_FILENO;
+            return isatty (fd) != 0;
+#endif
         }
 
         static inline std::mutex log_mutex;

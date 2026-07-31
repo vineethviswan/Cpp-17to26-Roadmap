@@ -34,13 +34,12 @@ namespace finv
     struct FilterConfig
     {
         std::vector<std::string> includePatterns;
-        std::vector<std::string> excludePatterns;
-        std::optional<int> maxDepth;
+        std::vector<std::string> excludePatterns;        
     };
 
     // The grouping key is just a string once resolved (extension, size bucket, or folder name)
     // No need for a variant type here; resolution happens once per record based on GroupBy mode.
-    using SummaryKey = std::string;
+    using SummaryKey = std::string;    
 
     struct SummaryEntry
     {

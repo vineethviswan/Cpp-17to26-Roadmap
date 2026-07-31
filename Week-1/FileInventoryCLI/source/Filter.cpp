@@ -8,45 +8,74 @@
 #include <cctype>
 #include <vector>
 
+namespace
+{
+    std::string NormalizeForMatch(std::string value)
+    {
+        std::transform(value.begin(), value.end(), value.begin(),
+            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        std::replace(value.begin(), value.end(), '\\', '/');
+        return value;
+    }
+
+    [[nodiscard]] bool HasWildcard(std::string_view pattern) noexcept
+    {
+        return pattern.find_first_of("*?") != std::string_view::npos;
+    }
+
+    [[nodiscard]] bool EndsWith(std::string_view text, std::string_view suffix) noexcept
+    {
+        return suffix.size() <= text.size() &&
+               text.compare(text.size() - suffix.size(), suffix.size(), suffix) == 0;
+    }
+}
+
 namespace finv
 {
     bool PathFilter::Matches(const std::filesystem::path& path) const
     {
-        // Convert path to string for pattern matching
-        std::string pathStr = path.string();
-        
-        // Make lowercase for case-insensitive matching
-        std::transform(pathStr.begin(), pathStr.end(), pathStr.begin(),
-                      [](unsigned char c) { return std::tolower(c); });
+        const std::string normalizedPath = NormalizeForMatch(path.generic_string());
 
-        // If there are include patterns, the path must match at least one
-        if (!config_.includePatterns.empty())
+        // Include defaults to "allow all" when no include patterns are provided.
+        if (!config_.includePatterns.empty() && !MatchesAny(normalizedPath, config_.includePatterns))
         {
-            if (!MatchesAny(pathStr, config_.includePatterns))
-                return false;
+            return false;
         }
 
-        // If there are exclude patterns, the path must NOT match any
-        if (!config_.excludePatterns.empty())
+        // Exclude patterns always take precedence.
+        if (!config_.excludePatterns.empty() && MatchesAny(normalizedPath, config_.excludePatterns))
         {
-            if (MatchesAny(pathStr, config_.excludePatterns))
-                return false;
+            return false;
         }
 
         return true;
     }
 
-    bool PathFilter::MatchesAny(std::string_view path, 
+    bool PathFilter::MatchesAny(std::string_view path,
                                const std::vector<std::string>& patterns) noexcept
     {
         return std::any_of(patterns.begin(), patterns.end(),
-            [path](const std::string& pattern) {
-                // Convert pattern to lowercase for case-insensitive comparison
-                std::string lowerPattern = pattern;
-                std::transform(lowerPattern.begin(), lowerPattern.end(), 
-                             lowerPattern.begin(),
-                             [](unsigned char c) { return std::tolower(c); });
-                return GlobMatch(path, lowerPattern);
+            [path](const std::string& pattern)
+            {
+                if (pattern.empty())
+                {
+                    return false;
+                }
+
+                const std::string normalizedPattern = NormalizeForMatch(pattern);
+
+                // Scope: simple wildcard (*, ?) + extension shorthand + substring matching.
+                if (HasWildcard(normalizedPattern))
+                {
+                    return GlobMatch(path, normalizedPattern);
+                }
+
+                if (normalizedPattern.front() == '.')
+                {
+                    return EndsWith(path, normalizedPattern);
+                }
+
+                return path.find(normalizedPattern) != std::string_view::npos;
             });
     }
 
@@ -63,28 +92,24 @@ namespace finv
             {
                 if (pattern[patIdx] == '?')
                 {
-                    // ? matches any single character
                     ++textIdx;
                     ++patIdx;
                 }
                 else if (pattern[patIdx] == '*')
                 {
-                    // * matches any sequence of characters
                     starIdx = patIdx;
                     matchIdx = textIdx;
                     ++patIdx;
                 }
                 else if (pattern[patIdx] == text[textIdx])
                 {
-                    // Characters match exactly
                     ++textIdx;
                     ++patIdx;
                 }
                 else if (starIdx != std::string_view::npos)
                 {
-                    // Previous * didn't match enough, try matching more
                     patIdx = starIdx + 1;
-                    matchIdx++;
+                    ++matchIdx;
                     textIdx = matchIdx;
                 }
                 else
@@ -94,9 +119,8 @@ namespace finv
             }
             else if (starIdx != std::string_view::npos)
             {
-                // More text but pattern exhausted; backtrack to last *
                 patIdx = starIdx + 1;
-                matchIdx++;
+                ++matchIdx;
                 textIdx = matchIdx;
             }
             else
@@ -105,7 +129,6 @@ namespace finv
             }
         }
 
-        // Check for remaining pattern characters (should only be *)
         while (patIdx < pattern.length() && pattern[patIdx] == '*')
         {
             ++patIdx;

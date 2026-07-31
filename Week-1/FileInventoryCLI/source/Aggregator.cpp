@@ -8,12 +8,22 @@ namespace finv
     {
         SummaryKey key = ResolveKey (record);
         auto &entry = groups[key];
+
+        if (entry.fileCount == 0)
+        {
+            entry.minSizeBytes = record.sizeBytes;
+            entry.maxSizeBytes = record.sizeBytes;
+        }
+        else
+        {
+            if (record.sizeBytes < entry.minSizeBytes)
+                entry.minSizeBytes = record.sizeBytes;
+            if (record.sizeBytes > entry.maxSizeBytes)
+                entry.maxSizeBytes = record.sizeBytes;
+        }
+
         entry.fileCount++;
         entry.totalSizeBytes += record.sizeBytes;
-        if (record.sizeBytes < entry.minSizeBytes)
-            entry.minSizeBytes = record.sizeBytes;
-        if (record.sizeBytes > entry.maxSizeBytes)
-            entry.maxSizeBytes = record.sizeBytes;
         totals.totalFileCount++;
         totals.totalSizeBytes += record.sizeBytes;
     }

@@ -15,6 +15,7 @@ namespace finv
         GroupBy groupBy = GroupBy::EXTENSION;
         ReportFormat reportFormat = ReportFormat::PLAINTEXT;
         std::optional<std::filesystem::path> outputFile;
+        std::optional<int> maxDepth;
     };
 
     struct CliParseError : public std::runtime_error
