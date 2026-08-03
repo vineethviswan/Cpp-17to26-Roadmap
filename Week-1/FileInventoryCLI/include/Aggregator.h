@@ -11,8 +11,8 @@ namespace finv
     public:
         explicit Aggregator (GroupBy groupBy) : mode (groupBy) { }
         void Add (const FileRecord &record);
-        [[nodiscard]] const std::map<SummaryKey, SummaryEntry> &GetGroups () const { return groups; }
-        [[nodiscard]] const Totals &GetTotals () const { return totals; }
+        const std::map<SummaryKey, SummaryEntry> &GetGroups () const { return groups; }
+        const Totals &GetTotals () const { return totals; }
 
     private:
         GroupBy mode;
