@@ -2,51 +2,75 @@
 #include "Aggregator.h"
 #include "Types.h"
 
+#include <utility>
+
 namespace finv
 {
-    void Aggregator::Add (const FileRecord &record)
+    SummaryEntry MergeEntry (const SummaryEntry &current, const FileRecord &rec)
     {
-        SummaryKey key = ResolveKey (record);
-        auto &entry = groups[key];
+        SummaryEntry next = current;
+        next.fileCount++;
+        next.totalSizeBytes += rec.sizeBytes;
 
-        if (entry.fileCount == 0)
+        if (!next.minSizeBytes || rec.sizeBytes < *next.minSizeBytes)
         {
-            entry.minSizeBytes = record.sizeBytes;
-            entry.maxSizeBytes = record.sizeBytes;
-        }
-        else
-        {
-            if (record.sizeBytes < entry.minSizeBytes)
-                entry.minSizeBytes = record.sizeBytes;
-            if (record.sizeBytes > entry.maxSizeBytes)
-                entry.maxSizeBytes = record.sizeBytes;
+            next.minSizeBytes = rec.sizeBytes;
         }
 
-        entry.fileCount++;
-        entry.totalSizeBytes += record.sizeBytes;
-        totals.totalFileCount++;
-        totals.totalSizeBytes += record.sizeBytes;
+        if (!next.maxSizeBytes || rec.sizeBytes > *next.maxSizeBytes)
+        {
+            next.maxSizeBytes = rec.sizeBytes;
+        }
+
+        return next;
     }
-    SummaryKey Aggregator::ResolveKey (const FileRecord &record) const
+
+    Totals MergeTotals (const Totals &current, const FileRecord &rec)
+    {
+        Totals next = current;
+        next.totalFileCount++;
+        next.totalSizeBytes += rec.sizeBytes;
+        return next;
+    }
+
+    SummaryKey ResolveKey (GroupBy mode, const FileRecord &rec)
     {
         switch (mode)
         {
             case GroupBy::EXTENSION:
-                return record.extension;
+                return rec.extension;
             case GroupBy::SIZEBUCKET:
-                if (record.sizeBytes < 1024)
+                if (rec.sizeBytes < 1024)
                     return "<1KB";
-                else if (record.sizeBytes < 1024 * 1024)
+                else if (rec.sizeBytes < 1024 * 1024)
                     return "1KB-1MB";
-                else if (record.sizeBytes < 1024 * 1024 * 1024)
+                else if (rec.sizeBytes < 1024 * 1024 * 1024)
                     return "1MB-1GB";
                 else
                     return ">1GB";
             case GroupBy::FOLDER:
-                return record.path.parent_path ().string ();
+                return rec.path.parent_path ().string ();
             case GroupBy::NONE:
             default:
                 return "ALL";
         }
+    }
+
+    AggregationResult AggregateOne (const AggregationResult &current, const FileRecord &rec, GroupBy mode)
+    {
+        AggregationResult next = current;
+        auto key = ResolveKey (mode, rec);
+
+        auto it = next.groups.find (key);
+        const SummaryEntry baseline = (it != next.groups.end ()) ? it->second : SummaryEntry {};
+        next.groups[key] = MergeEntry (baseline, rec);
+        next.totals = MergeTotals (next.totals, rec);
+
+        return next;
+    }
+
+    void Aggregator::Add (const FileRecord &record)
+    {
+        result = AggregateOne (result, record, mode);
     }
 }

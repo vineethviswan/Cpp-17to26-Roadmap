@@ -3,34 +3,31 @@
 #include "Types.h"
 
 #include <filesystem>
-#include <map>
 #include <memory>
 #include <ostream>
 
 namespace finv
 {
-    class Aggregator;
-
     class Report
     {
     public:
         virtual ~Report () = default;
         virtual void Write (std::ostream &os, const std::filesystem::path &root, GroupBy groupBy,
-                const Aggregator &aggregator) const = 0;
+                const AggregationResult &aggregationResult) const = 0;
     };
 
     class TextReport : public Report
     {
     public:
         void Write (std::ostream &os, const std::filesystem::path &root, GroupBy groupBy,
-                const Aggregator &aggregator) const override;
+                const AggregationResult &aggregationResult) const override;
     };
 
     class JsonReport : public Report
     {
     public:
         void Write (std::ostream &os, const std::filesystem::path &root, GroupBy groupBy,
-                const Aggregator &aggregator) const override;
+                const AggregationResult &aggregationResult) const override;
     };
 
     std::unique_ptr<Report> CreateReport (ReportFormat format);

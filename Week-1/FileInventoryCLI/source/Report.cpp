@@ -1,12 +1,12 @@
 
 #include "Report.h"
-#include "Aggregator.h"
 #include "Types.h"
 
 #include <iomanip>
 #include <format>
 #include <ostream>
 #include <string>
+#include <string_view>
 #include <memory>
 #include <map>
 #include <cstdint>
@@ -16,7 +16,7 @@ namespace finv
 {
 	namespace
 	{
-		const char* GroupByToString(GroupBy g)
+		constexpr std::string_view GroupByToString(GroupBy g)
 		{
 			switch (g)
 			{
@@ -29,7 +29,7 @@ namespace finv
 		}
 
 		// Simple JSON string escaper
-		std::string JsonEscape(const std::string &s)
+		std::string JsonEscape(std::string_view s)
 		{
 			std::string out;
 			out.reserve(s.size() + 8);
@@ -72,10 +72,10 @@ namespace finv
 	}
 
 	void TextReport::Write (std::ostream &os, const std::filesystem::path &root, GroupBy groupBy,
-			const Aggregator &aggregator) const
+			const AggregationResult &aggregationResult) const
 	{
-		const auto &groups = aggregator.GetGroups();
-		const auto &totals = aggregator.GetTotals();
+		const auto &groups = aggregationResult.groups;
+		const auto &totals = aggregationResult.totals;
 
 		os << "Root: " << root.string() << "\n";
 		os << "Group By: " << GroupByToString(groupBy) << "\n";
@@ -95,8 +95,8 @@ namespace finv
 			os << std::left << std::setw(32) << keyOut
 				<< std::right << std::setw(10) << e.fileCount
 				<< std::setw(18) << HumanSize(e.totalSizeBytes)
-				<< std::setw(12) << HumanSize(e.minSizeBytes)
-				<< std::setw(12) << HumanSize(e.maxSizeBytes) << "\n";
+				<< std::setw(12) << HumanSize(e.minSizeBytes.value_or(0))
+				<< std::setw(12) << HumanSize(e.maxSizeBytes.value_or(0)) << "\n";
 		}
 
 		os << "\n";
@@ -104,10 +104,10 @@ namespace finv
 	}
 
 	void JsonReport::Write (std::ostream &os, const std::filesystem::path &root, GroupBy groupBy,
-			const Aggregator &aggregator) const
+			const AggregationResult &aggregationResult) const
 	{
-		const auto &groups = aggregator.GetGroups();
-		const auto &totals = aggregator.GetTotals();
+		const auto &groups = aggregationResult.groups;
+		const auto &totals = aggregationResult.totals;
 
 		// Minimal hand-rolled JSON
 		os << "{";
@@ -126,8 +126,8 @@ namespace finv
 			os << "\"key\":\"" << JsonEscape(k) << "\",";
 			os << "\"fileCount\":" << e.fileCount << ",";
 			os << "\"totalBytes\":" << e.totalSizeBytes << ",";
-			os << "\"minBytes\":" << e.minSizeBytes << ",";
-			os << "\"maxBytes\":" << e.maxSizeBytes;
+			os << "\"minBytes\":" << e.minSizeBytes.value_or(0) << ",";
+			os << "\"maxBytes\":" << e.maxSizeBytes.value_or(0);
 			os << "}";
 		}
 		os << "],";

@@ -4,6 +4,7 @@
 #include <string>
 #include <algorithm>
 #include <cctype>
+#include <string_view>
 
 namespace finv
 {
@@ -19,11 +20,11 @@ namespace finv
 
     CLIOptions ParseArgs (int argc, char** argv)
     {
-        CLIOptions opts;
-        bool rootSet = false;
+        CLIOptions opts;        
+        std::optional<std::filesystem::path> rootPath;
         for (int i = 1; i < argc; ++i)
-        {
-            std::string arg = argv[i];
+        {            
+            std::string_view arg = argv[i];
 
             if (arg.starts_with("--"))
             {
@@ -113,14 +114,14 @@ namespace finv
             }
             else
             {
-                if (rootSet)
+                if (rootPath.has_value ())
                     throw CliParseError("Multiple root directories provided");
-                opts.rootDirectory = std::filesystem::path(arg);
-                rootSet = true;
+                rootPath = std::filesystem::path (arg);
+                opts.rootDirectory = *rootPath;
             }
         }
 
-        if (!rootSet)
+        if (!rootPath.has_value ())
             throw CliParseError("Root directory not specified");
 
         return opts;

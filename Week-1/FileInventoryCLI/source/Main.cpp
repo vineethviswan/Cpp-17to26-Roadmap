@@ -39,9 +39,12 @@ int main (int argc, char *argv[])
 
     PathFilter filter (options.filterConfig);
     Scanner scanner (options.rootDirectory, filter, options.maxDepth);
-    Aggregator aggregator (options.groupBy);
+    AggregationResult aggregationResult;
 
-    scanner.Scan ([&aggregator] (const FileRecord &record) { aggregator.Add (record); });
+    scanner.Scan ([&aggregationResult, mode = options.groupBy] (const FileRecord &record)
+    {
+        aggregationResult = AggregateOne (aggregationResult, record, mode);
+    });
 
     auto report = CreateReport (options.reportFormat);
 
@@ -53,11 +56,11 @@ int main (int argc, char *argv[])
             Logger::Log (Logger::Level::ERROR, "Failed to open output file: {}", options.outputFile->string ());
             return 1;
         }
-        report->Write (ofs, options.rootDirectory, options.groupBy, aggregator);
+        report->Write (ofs, options.rootDirectory, options.groupBy, aggregationResult);
     }
     else
     {
-        report->Write (std::cout, options.rootDirectory, options.groupBy, aggregator);
+        report->Write (std::cout, options.rootDirectory, options.groupBy, aggregationResult);
     }
 
     return 0;

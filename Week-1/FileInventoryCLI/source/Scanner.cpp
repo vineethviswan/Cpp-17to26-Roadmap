@@ -2,10 +2,25 @@
 #include "Scanner.h"
 #include "Types.h"
 
+#include <algorithm>
+#include <cctype>
 #include <filesystem>
 #include <system_error>
-#include <functional>
-#include <cctype>
+
+namespace
+{
+    char ToLowerAscii(char ch)
+    {
+        return static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+    }
+
+    std::string NormalizedExtension(const std::filesystem::path& filePath)
+    {
+        std::string ext = filePath.extension().string();
+        std::transform(ext.begin(), ext.end(), ext.begin(), ToLowerAscii);
+        return ext;
+    }
+}
 
 namespace finv
 {
@@ -14,7 +29,6 @@ namespace finv
     void Scanner::Scan (const std::function<void (const FileRecord&)>& onRecord) const
     {
         using namespace std::filesystem;
-        FilterConfig config = filter.GetConfig ();
         std::error_code ec;
 
         if (!exists(root, ec) || !is_directory(root, ec))
@@ -23,7 +37,7 @@ namespace finv
             return;
         }
 
-        directory_options options = directory_options::skip_permission_denied;
+        const directory_options options = directory_options::skip_permission_denied;
         for (recursive_directory_iterator it(root, options, ec), end; it != end; it.increment(ec))
         {
             if (ec)
@@ -33,10 +47,12 @@ namespace finv
                 continue;
             }
 
-            const directory_entry &entry = *it;
+            const directory_entry& entry = *it;
+            const path& entryPath = entry.path();
+
             // Only consider regular files
             std::error_code statEc;
-            if (!entry.is_regular_file(statEc))
+            if (!entry.is_regular_file(statEc) || statEc)
             {
                 continue;
             }
@@ -48,43 +64,28 @@ namespace finv
             }
 
             // Apply path filtering (include/exclude patterns)
-            if (!filter.Matches(entry.path()))
+            if (!filter.Matches(entryPath))
             {
                 continue;
             }
 
             FileRecord rec;
-            rec.path = entry.path();
+            rec.path = entryPath;
+            rec.extension = NormalizedExtension(entryPath);
 
-            // extension (normalize to lowercase, include leading '.')
-            try
-            {
-                rec.extension = entry.path().extension().string();
-                for (auto &c : rec.extension)
-                    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-            }
-            catch (...)
-            {
-                rec.extension.clear();
-            }
-
-            try
-            {
-                rec.sizeBytes = entry.file_size();
-            }
-            catch (const std::filesystem::filesystem_error &)
+            std::error_code sizeEc;
+            rec.sizeBytes = entry.file_size(sizeEc);
+            if (sizeEc)
             {
                 // Could not determine size; skip this file
                 continue;
             }
 
-            try
+            std::error_code timeEc;
+            rec.lastModified = entry.last_write_time(timeEc);
+            if (timeEc)
             {
-                rec.lastModified = entry.last_write_time();
-            }
-            catch (...)
-            {
-                /* ignore timestamp failures */
+                rec.lastModified = {};
             }
 
             // Deliver record to caller

@@ -2,7 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
-#include <limits>
+#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -45,14 +45,20 @@ namespace finv
     {
         std::size_t fileCount = 0;
         std::uintmax_t totalSizeBytes = 0;
-        std::uintmax_t minSizeBytes = std::numeric_limits<std::uintmax_t>::max ();
-        std::uintmax_t maxSizeBytes = 0;
+        std::optional<std::uintmax_t> minSizeBytes;
+        std::optional<std::uintmax_t> maxSizeBytes;
     };
 
     struct Totals
     {
         std::size_t totalFileCount = 0;
         std::uintmax_t totalSizeBytes = 0;
+    };
+
+    struct AggregationResult
+    {
+        std::map<SummaryKey, SummaryEntry> groups;
+        Totals totals {};
     };
 
 }
