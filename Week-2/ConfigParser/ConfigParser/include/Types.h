@@ -4,6 +4,9 @@
 #define TYPES
 
 #include <string>
+#include <variant>
+#include <vector>
+#include <map>
 
 enum class TokenType
 {
@@ -37,5 +40,9 @@ struct Error
     int columnNumber;
     std::string message;
 };
+
+using Value = std::variant<int, std::string, bool, std::vector<std::string>>;
+using Section = std::map<std::string, Value>;
+using Document = std::map<std::string, Section>;
 
 #endif // !TYPES

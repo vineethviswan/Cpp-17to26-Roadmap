@@ -149,11 +149,13 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\Logger.h" />
+    <ClInclude Include="include\Parser.h" />
     <ClInclude Include="include\Tokenizer.h" />
     <ClInclude Include="include\Types.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\Main.cpp" />
+    <ClCompile Include="source\Parser.cpp" />
     <ClCompile Include="source\Tokenizer.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
