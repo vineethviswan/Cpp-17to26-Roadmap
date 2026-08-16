@@ -1,7 +1,11 @@
 #pragma once
 
+// Parser is a stateless, value-oriented service: Parse() consumes a vector
+// of tokens and returns either a Document or an Error. Line and column
+// numbers carried in Token are one-based for user-facing diagnostics.
+
 #include "Logger.h"
-#include "Types.h"
+#include "ConfigTypes.h"
 
 class Parser
 {
@@ -11,5 +15,5 @@ public:
     std::variant<Document, Error> Parse (const std::vector<Token> &tokens);
 
 private:
-    Document document;
+    // No per-instance state. Document member removed to keep Parser stateless.
 };

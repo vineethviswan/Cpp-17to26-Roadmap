@@ -148,10 +148,11 @@
     <None Include="test_config.ini" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="include\ConfigTypes.h" />
     <ClInclude Include="include\Logger.h" />
     <ClInclude Include="include\Parser.h" />
+    <ClInclude Include="include\StringUtil.h" />
     <ClInclude Include="include\Tokenizer.h" />
-    <ClInclude Include="include\Types.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source\Main.cpp" />

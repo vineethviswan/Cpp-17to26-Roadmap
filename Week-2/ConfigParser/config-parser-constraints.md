@@ -43,7 +43,7 @@ File writing, formatting preservation, interpolation, nested sections, and other
 
 ### Comments and blank lines
 
-- A comment is a full line whose first non-whitespace character is `#`.
+- A comment is a full line whose first non-whitespace character is `;`.
 - Inline comments are not supported.
 - Blank lines and comment lines are ignored.
 

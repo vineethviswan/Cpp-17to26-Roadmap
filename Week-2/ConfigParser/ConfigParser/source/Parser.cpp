@@ -1,140 +1,218 @@
 
 #include "Parser.h"
 #include "Logger.h"
+#include "StringUtil.h"
 #include <algorithm>
 #include <cctype>
+#include <charconv>
+#include <optional>
+#include <system_error>
 
 namespace
 {
-    bool TryParseBoolean(const std::string& value, bool& result)
-    {
-        std::string lower = value;
-        std::transform(lower.begin(), lower.end(), lower.begin(),
-                      [](unsigned char c) { return std::tolower(c); });
 
-        if (lower == "true")
-        {
-            result = true;
-            return true;
-        }
-        else if (lower == "false")
-        {
-            result = false;
-            return true;
-        }
-        return false;
-    }
-
-    bool TryParseInteger(const std::string& value, int& result)
+    std::optional<bool> TryParseBoolean(const std::string& value)
     {
-        try
+        if (value == "true")
         {
-            result = std::stoi(value);
             return true;
         }
-        catch (...)
+
+        if (value == "false")
         {
             return false;
         }
+
+        return std::nullopt;
+    }
+
+    std::optional<std::int64_t> TryParseInteger(const std::string& value)
+    {
+        if (value.empty())
+        {
+            return std::nullopt;
+        }
+
+        const char* begin = value.data();
+        const char* end = begin + value.size();
+        std::int64_t parsed = 0;
+        const auto status = std::from_chars(begin, end, parsed);
+
+        if (status.ec != std::errc() || status.ptr != end)
+        {
+            return std::nullopt;
+        }
+
+        return parsed;
     }
 
     bool IsArray(const std::string& value)
     {
-        std::string trimmed = value;
-        // Trim leading spaces
-        size_t start = trimmed.find_first_not_of(" \t");
-        if (start != std::string::npos)
-        {
-            trimmed = trimmed.substr(start);
-        }
-        // Trim trailing spaces
-        size_t end = trimmed.find_last_not_of(" \t");
-        if (end != std::string::npos)
-        {
-            trimmed = trimmed.substr(0, end + 1);
-        }
+        const std::string trimmed = Trim(value);
         return !trimmed.empty() && trimmed.front() == '[' && trimmed.back() == ']';
     }
 
-    std::vector<std::string> ParseArray(const std::string& value)
+    std::variant<ScalarValue, Error> ParseScalarValue(const std::string& rawValue, int lineNumber)
     {
-        std::vector<std::string> result;
-
-        // Remove the [ and ]
-        std::string content = value;
-        size_t start = content.find('[');
-        size_t end = content.rfind(']');
-
-        if (start != std::string::npos && end != std::string::npos && start < end)
+        const std::string value = Trim(rawValue);
+        if (value.empty())
         {
-            content = content.substr(start + 1, end - start - 1);
+            return Error{ lineNumber, 0, "Empty value" };
         }
 
-        // Split by comma and trim whitespace
-        size_t pos = 0;
-        while (pos < content.length())
+        if (const auto boolValue = TryParseBoolean(value))
         {
-            size_t commaPos = content.find(',', pos);
-            std::string element;
+            return ScalarValue{ *boolValue };
+        }
 
-            if (commaPos == std::string::npos)
+        if (const auto integerValue = TryParseInteger(value))
+        {
+            return ScalarValue{ *integerValue };
+        }
+
+        return ScalarValue{ value };
+    }
+
+    std::variant<ArrayValue, Error> ParseArrayValue(const std::string& rawValue, int lineNumber)
+    {
+        const std::string trimmed = Trim(rawValue);
+        if (trimmed.size() < 2 || trimmed.front() != '[' || trimmed.back() != ']')
+        {
+            return Error{ lineNumber, 0, "Malformed array" };
+        }
+
+        const std::string content = trimmed.substr(1, trimmed.size() - 2);
+        if (content.empty())
+        {
+            return Error{ lineNumber, 0, "Array must contain at least one element" };
+        }
+
+        if (content.find('[') != std::string::npos || content.find(']') != std::string::npos)
+        {
+            return Error{ lineNumber, 0, "Nested arrays are not supported" };
+        }
+
+        std::vector<std::string> items;
+        std::string current;
+        for (char ch : content)
+        {
+            if (ch == ',')
             {
-                element = content.substr(pos);
-                pos = content.length();
+                items.push_back(current);
+                current.clear();
             }
             else
             {
-                element = content.substr(pos, commaPos - pos);
-                pos = commaPos + 1;
+                current.push_back(ch);
+            }
+        }
+        items.push_back(current);
+
+        std::vector<ScalarValue> parsedValues;
+        parsedValues.reserve(items.size());
+
+        for (const std::string& item : items)
+        {
+            const std::string trimmedItem = Trim(item);
+            if (trimmedItem.empty())
+            {
+                return Error{ lineNumber, 0, "Array elements cannot be empty" };
             }
 
-            // Trim leading spaces
-            size_t elemStart = element.find_first_not_of(" \t");
-            if (elemStart != std::string::npos)
+            const auto parsed = ParseScalarValue(trimmedItem, lineNumber);
+            if (std::holds_alternative<Error>(parsed))
             {
-                element = element.substr(elemStart);
+                return std::get<Error>(parsed);
             }
 
-            // Trim trailing spaces
-            size_t elemEnd = element.find_last_not_of(" \t");
-            if (elemEnd != std::string::npos)
+            parsedValues.push_back(std::get<ScalarValue>(parsed));
+        }
+
+        if (parsedValues.empty())
+        {
+            return Error{ lineNumber, 0, "Array must contain at least one element" };
+        }
+
+        bool allBool = true;
+        bool allInt = true;
+        bool allString = true;
+
+        for (const auto& value : parsedValues)
+        {
+            if (!std::holds_alternative<bool>(value))
             {
-                element = element.substr(0, elemEnd + 1);
-            }
-            else if (!element.empty())
-            {
-                element.clear();
+                allBool = false;
             }
 
-            if (!element.empty())
+            if (!std::holds_alternative<std::int64_t>(value))
             {
-                result.push_back(element);
+                allInt = false;
+            }
+
+            if (!std::holds_alternative<std::string>(value))
+            {
+                allString = false;
             }
         }
 
-        return result;
+        if (allBool)
+        {
+            BoolArray boolArray;
+            boolArray.reserve(parsedValues.size());
+            for (const auto& value : parsedValues)
+            {
+                boolArray.push_back(std::get<bool>(value));
+            }
+            return ArrayValue{ boolArray };
+        }
+
+        if (allInt)
+        {
+            IntArray intArray;
+            intArray.reserve(parsedValues.size());
+            for (const auto& value : parsedValues)
+            {
+                intArray.push_back(std::get<std::int64_t>(value));
+            }
+            return ArrayValue{ intArray };
+        }
+
+        if (allString)
+        {
+            StringArray stringArray;
+            stringArray.reserve(parsedValues.size());
+            for (const auto& value : parsedValues)
+            {
+                stringArray.push_back(std::get<std::string>(value));
+            }
+            return ArrayValue{ stringArray };
+        }
+
+        return Error{ lineNumber, 0, "Array elements must all be the same scalar type" };
     }
 
-    Value ConvertValue(const std::string& valueStr, int lineNumber)
+    std::variant<Value, Error> ParseValue(const std::string& valueStr, int lineNumber)
     {
-        if (IsArray(valueStr))
+        const std::string trimmed = Trim(valueStr);
+
+        if (IsArray(trimmed))
         {
-            return ParseArray(valueStr);
+            const auto arrayResult = ParseArrayValue(trimmed, lineNumber);
+            if (std::holds_alternative<Error>(arrayResult))
+            {
+                return std::get<Error>(arrayResult);
+            }
+
+            return Value{ std::get<ArrayValue>(arrayResult) };
         }
 
-        bool boolVal;
-        if (TryParseBoolean(valueStr, boolVal))
+        const auto scalarResult = ParseScalarValue(trimmed, lineNumber);
+        if (std::holds_alternative<Error>(scalarResult))
         {
-            return boolVal;
+            return std::get<Error>(scalarResult);
         }
 
-        int intVal;
-        if (TryParseInteger(valueStr, intVal))
-        {
-            return intVal;
-        }
-
-        return valueStr;
+        return Value{ std::get<ScalarValue>(scalarResult) };
     }
 }
 
@@ -149,71 +227,92 @@ std::variant<Document, Error> Parser::Parse (const std::vector<Token>& tokens)
     {
         const Token& token = tokens[i];
 
-        // Skip blank lines and comments
-        if (token.type == TokenType::BlankLine || token.type == TokenType::Comment)
+        switch (token.type)
         {
-            continue;
-        }
+            case TokenType::BlankLine:
+            case TokenType::Comment:
+                // Ignored on their own
+                break;
 
-        // Handle section headers
-        if (token.type == TokenType::SectionHeader)
-        {
-            currentSection = token.value;
-            Logger::Log(Logger::Level::DEBUG, "Found section: [{}] at line {}", currentSection, token.lineNumber);
-
-            if (doc.find(currentSection) == doc.end())
+            case TokenType::SectionHeader:
             {
-                doc[currentSection] = Section();
-            }
-            continue;
-        }
+                currentSection = token.value;
+                Logger::Log(Logger::Level::DEBUG, "Found section: [{}] at line {}", currentSection, token.lineNumber);
 
-        // Handle key-value pairs
-        if (token.type == TokenType::Key)
-        {
-            // Ensure we have a current section
-            if (currentSection.empty())
-            {
-                Logger::Log(Logger::Level::ERROR, "Key '{}' found at line {} without a section header", 
-                           token.value, token.lineNumber);
-                return Error { token.lineNumber, token.columnNumber, 
-                             "Key found without section header" };
+                const auto [sectionIt, inserted] = doc.emplace(currentSection, Section{});
+                if (!inserted)
+                {
+                    Logger::Log(Logger::Level::ERROR, "Section '{}' already exists at line {}", currentSection, token.lineNumber);
+                    return Error { token.lineNumber, token.columnNumber, "Section already exists" };
+                }
+                break;
             }
 
-            // Next tokens should be Equals and Value
-            if (i + 2 >= tokens.size())
+            case TokenType::Key:
             {
-                Logger::Log(Logger::Level::ERROR, "Incomplete key-value pair at line {}", token.lineNumber);
-                return Error { token.lineNumber, token.columnNumber, 
-                             "Incomplete key-value pair" };
+                // Expect pattern: Key, Equals, Value
+                if (currentSection.empty())
+                {
+                    Logger::Log(Logger::Level::ERROR, "Key '{}' found at line {} without a section header", token.value, token.lineNumber);
+                    return Error { token.lineNumber, token.columnNumber, "Key found without section header" };
+                }
+
+                if (i + 2 >= tokens.size())
+                {
+                    Logger::Log(Logger::Level::ERROR, "Incomplete key-value pair at line {}", token.lineNumber);
+                    return Error { token.lineNumber, token.columnNumber, "Incomplete key-value pair" };
+                }
+
+                const Token& next = tokens[i + 1];
+                const Token& next2 = tokens[i + 2];
+
+                if (next.type != TokenType::Equals)
+                {
+                    Logger::Log(Logger::Level::ERROR, "Expected '=' after key at line {}", next.lineNumber);
+                    return Error { next.lineNumber, next.columnNumber, "Expected '=' after key" };
+                }
+
+                if (next2.type != TokenType::Value)
+                {
+                    Logger::Log(Logger::Level::ERROR, "Expected value after '=' at line {}", next2.lineNumber);
+                    return Error { next2.lineNumber, next2.columnNumber, "Expected value after '='" };
+                }
+
+                const std::string& key = token.value;
+                const std::string& valueStr = next2.value;
+
+                Logger::Log(Logger::Level::DEBUG, "Parsing key '{}' with value '{}' in section [{}]", key, valueStr, currentSection);
+
+                const auto valueOrError = ParseValue(valueStr, token.lineNumber);
+                if (std::holds_alternative<Error>(valueOrError))
+                {
+                    return std::get<Error>(valueOrError);
+                }
+
+                auto& section = doc[currentSection];
+                const auto [_, inserted] = section.emplace(key, std::get<Value>(valueOrError));
+                if (!inserted)
+                {
+                    Logger::Log(Logger::Level::ERROR, "Key '{}' already exists in section [{}] at line {}", key, currentSection, token.lineNumber);
+                    return Error { token.lineNumber, token.columnNumber, "Key already exists" };
+                }
+
+                // advance past Equals and Value
+                i += 2;
+                break;
             }
 
-            if (tokens[i + 1].type != TokenType::Equals)
-            {
-                Logger::Log(Logger::Level::ERROR, "Expected '=' after key at line {}", token.lineNumber);
-                return Error { tokens[i + 1].lineNumber, tokens[i + 1].columnNumber, 
-                             "Expected '=' after key" };
-            }
+            case TokenType::Equals:
+                Logger::Log(Logger::Level::ERROR, "Unexpected '=' at line {} column {}", token.lineNumber, token.columnNumber);
+                return Error { token.lineNumber, token.columnNumber, "Unexpected '='" };
 
-            if (tokens[i + 2].type != TokenType::Value)
-            {
-                Logger::Log(Logger::Level::ERROR, "Expected value after '=' at line {}", token.lineNumber);
-                return Error { tokens[i + 2].lineNumber, tokens[i + 2].columnNumber, 
-                             "Expected value after '='" };
-            }
+            case TokenType::Value:
+                Logger::Log(Logger::Level::ERROR, "Unexpected value token at line {} column {}", token.lineNumber, token.columnNumber);
+                return Error { token.lineNumber, token.columnNumber, "Unexpected value token" };
 
-            const std::string& key = token.value;
-            const std::string& valueStr = tokens[i + 2].value;
-
-            Logger::Log(Logger::Level::DEBUG, "Parsing key '{}' with value '{}' in section [{}]", 
-                       key, valueStr, currentSection);
-
-            Value value = ConvertValue(valueStr, token.lineNumber);
-            doc[currentSection][key] = value;
-
-            // Skip the Equals and Value tokens
-            i += 2;
-            continue;
+            default:
+                Logger::Log(Logger::Level::ERROR, "Unknown token type at line {} column {}", token.lineNumber, token.columnNumber);
+                return Error { token.lineNumber, token.columnNumber, "Unknown token type" };
         }
     }
 
