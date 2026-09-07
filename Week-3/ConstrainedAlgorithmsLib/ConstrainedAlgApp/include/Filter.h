@@ -5,8 +5,9 @@
 
 #include <vector>
 #include <optional>
+#include <concepts>
 
-template<typename T, typename F>
+template<typename T, std::predicate< const T&> F>
 std::optional<std::vector<T>> Filter (const std::vector<T>& vec, F pred)
 {
     std::vector<T> result;

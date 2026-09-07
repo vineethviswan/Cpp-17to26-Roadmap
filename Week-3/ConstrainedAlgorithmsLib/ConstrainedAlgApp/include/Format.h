@@ -5,8 +5,14 @@
 
 #include <vector>
 #include <string>
+#include <concepts>
 
 template<typename T>
+concept ConvertibleToString = requires (T t) {
+    { std::to_string (t) } -> std::convertible_to<std::string>;
+};
+
+template<ConvertibleToString T>
 std::string Format (const std::vector<T> &vec, const std::string &delimiter = ", ")
 {
     std::string result;

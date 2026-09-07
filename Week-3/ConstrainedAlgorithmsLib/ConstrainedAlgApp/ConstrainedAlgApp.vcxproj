@@ -149,6 +149,7 @@
     <ClInclude Include="include\Filter.h" />
     <ClInclude Include="include\Format.h" />
     <ClInclude Include="include\Logger.h" />
+    <ClInclude Include="include\PrintRange.h" />
     <ClInclude Include="include\Search.h" />
   </ItemGroup>
   <ItemGroup>

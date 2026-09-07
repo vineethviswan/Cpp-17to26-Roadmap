@@ -3,9 +3,27 @@
 #include "Search.h"
 #include "Filter.h"
 #include "Format.h"
+#include "PrintRange.h"
 
 #include <vector>
 #include <string>
+#include <array>
+
+// Type with no comparison operators
+class NoComparison
+{
+    int value;
+
+public:    
+    NoComparison (int v = 0) : value (v) { }
+
+    // Explicitly delete comparison operators
+    bool operator< (const NoComparison &) const = delete;
+    bool operator> (const NoComparison &) const = delete;
+    bool operator<= (const NoComparison &) const = delete;
+    bool operator>= (const NoComparison &) const = delete;
+    bool operator== (const NoComparison &) const = delete;
+};
 
 int main ()
 {
@@ -25,6 +43,17 @@ int main ()
     // Example usage of Format
     std::string formatted = Format (vec, " | ");
     Logger::Log (Logger::Level::INFO, "Formatted vector: {}", formatted);
+
+    // Case that breaks - NoComparison has deleted operator==
+    // std::vector<NoComparison> vec2 = {NoComparison (1), NoComparison (2), NoComparison (3)};
+    // auto result2 = Search (vec2, NoComparison (2));  // This will fail to compile!
+
+    std::vector<int> numbers {1, 2, 3};
+    std::array<int, 3> values {4, 5, 6};
+
+    PrintRange (numbers);
+    PrintRange (values);
+    PrintRange (std::string {"hello"});
 
     return 0;
 }
