@@ -81,7 +81,7 @@ The implementation currently uses standard library concepts rather than a shared
 
 There is no `Sortable` concept in the current program. The algorithms do not sort and do not require `<`, `==`, or three-way comparison from their element types.
 
-## Example Program Flow
+## Example Program Flow 
 
 `source/Main.cpp` performs the following operations:
 
