@@ -3,8 +3,8 @@
 #define LOG_PARSER
 
 #include <optional>
-#include <string_view>
 #include <string>
+#include <string_view>
 
 #include "log_types.h"
 
@@ -25,7 +25,7 @@ std::optional<LogEntry> ParseLine (const RawLine &line)
         return std::nullopt;
     }
 
-    const auto level = FromString (std::string_view{line.content}.substr (level_start, level_end - level_start));
+    const auto level = FromString (std::string_view {line.content}.substr (level_start, level_end - level_start));
     if (!level)
     {
         return std::nullopt;
@@ -40,13 +40,9 @@ std::optional<LogEntry> ParseLine (const RawLine &line)
 
     const auto message_start = source_end + delimiter.size ();
 
-    return LogEntry{
-        *level,
-        line.content.substr (0, timestamp_end),
-        line.content.substr (source_start, source_end - source_start),
-        line.content.substr (message_start),
-        line.line_number
-    };
+    return LogEntry {*level, line.content.substr (0, timestamp_end),
+            line.content.substr (source_start, source_end - source_start), line.content.substr (message_start),
+            line.line_number};
 }
 
 bool LooksLikeWarningOrError (const RawLine &line)
@@ -65,8 +61,7 @@ bool LooksLikeWarningOrError (const RawLine &line)
         return false;
     }
 
-    const auto level = std::string_view{line.content}.substr (
-        level_start, level_end - level_start);
+    const auto level = std::string_view {line.content}.substr (level_start, level_end - level_start);
     return level == "WARNING" || level == "ERROR";
 }
 

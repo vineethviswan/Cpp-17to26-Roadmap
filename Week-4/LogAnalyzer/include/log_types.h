@@ -3,10 +3,10 @@
 #ifndef LOG_TYPES
 #define LOG_TYPES
 
-#include <string_view>
+#include <functional>
 #include <optional>
 #include <string>
-#include <functional>
+#include <string_view>
 
 enum class LogLevel
 {
@@ -65,12 +65,12 @@ struct LogEntry
 // Hash specialization for LogLevel to use as unordered_map key
 namespace std
 {
-    template <>
+    template<>
     struct hash<LogLevel>
     {
-        size_t operator()(const LogLevel& level) const noexcept
+        size_t operator() (const LogLevel &level) const noexcept
         {
-            return std::hash<int>()(static_cast<int>(level));
+            return std::hash<int> () (static_cast<int> (level));
         }
     };
 }

@@ -4,8 +4,8 @@
 #define LOG_LOADING
 
 #include <fstream>
-#include <string>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include "log_types.h"
@@ -23,7 +23,7 @@ public:
         std::string line;
         while (std::getline (file, line))
         {
-            lines.push_back ({ lines.size () + 1, line });
+            lines.push_back ({lines.size () + 1, line});
         }
     }
     const std::vector<RawLine> &GetLines () const { return lines; }
